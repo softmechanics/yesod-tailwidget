@@ -6,30 +6,23 @@
            , OverlappingInstances
            #-}
 
+module TailWidget where
+
 import Yesod
+import Yesod.Continuation
 import Text.Printf
 import System.Process
 import Control.Applicative
 import Data.Maybe
 
-
-mkYesodSub "TailWidget s y" [$parseRoutes|
-/#FilePath             TailLogR GET
-/tailLines/#FilePath   TailLinesR GET
-|]
-
-data TailWidget s y = TailWidget
-  { twPollInterval :: Int
-  , twInit :: GHandler (TailWidget s y) y String
-  , twCont :: GHandler (TailWidget s y) y String
-  }
-
 getTailLogR fp = defaultLayout $ tailWidget fp
 
-tailWidget :: FilePath -> GWidget Test Test ()
+tailWidget :: YesodContinuations y => FilePath -> GWidget s y ()
 tailWidget fp = do
   addScriptRemote "http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"
   logPanel <- newIdent
+  pollR <- liftHandler $ addCont $ getTailLinesR fp Nothing
+
   addJulius [$julius| 
     function handleLogResponse(resp) {
       $('#%logPanel%').append(resp.lines);
@@ -37,14 +30,16 @@ tailWidget fp = do
       log.scrollTop = log.scrollHeight;
 
       function poll () { 
-          $.ajax({url:"@TailLinesR fp@"+resp.lastLine, success:handleLogResponse}); 
+          $.ajax({url:resp.pollUrl, success:handleLogResponse}); 
       }
 
-      setTimeout(poll, 1000);
+      if(resp.pollUrl) {
+        setTimeout(poll, 1000);
+      }
     }
 
     $(document).ready(function () {
-      $.ajax({url:"@TailLinesR fp@", success:handleLogResponse})
+      $.ajax({url:"@pollR@", success:handleLogResponse})
     });
   |]
 
@@ -55,57 +50,19 @@ tailWidget fp = do
 jsonNum :: Num a => a -> Json
 jsonNum = jsonScalar . show
 
-getTailLinesR :: GHandler (TailWidget s y) y RepJson
-getTailLinesR fp = do
-  last <- lookupGetParam "lastLine"
+getTailLinesR :: YesodContinuations y => FilePath -> Maybe Int -> GHandler y y RepJson
+getTailLinesR fp last = do
   (last', lines) <- case last of
                          Nothing -> liftIO $ tailLast fp 50 
                          Just ln -> do
                            liftIO $ print ln
-                           liftIO $ tailAfter fp $ read ln
+                           liftIO $ tailAfter fp ln
+  pollR <- addCont $ getTailLinesR fp $ Just last'
+  render <- getUrlRender
   jsonToRepJson $ jsonMap [
-      ("lastLine", jsonScalar $ show last')
+      ("pollUrl", jsonScalar $ render pollR)
     , ("lines", jsonScalar lines)
     ]
-
-data FileTailState = FileTailState
-  { ftsPath :: FilePath
-  , ftsContext :: Int
-  }
-
-type FTWHandler y = TWHandler FileTailState y
-type TWHandler s y = GHandler (TailWidget s y) y 
-
-
-ftsSessionKey fp = do
-  -- TODO: decorate with master route to subsite
-  return fp
-
-ftsSaveCursor :: Int -> FTWHandler y ()
-ftsSaveCursor fp cur = do
-  k <- ftsSessionKey fp
-  setSession k $ show cur
-
-ftsLoadCursor :: FTWHandler y Int
-ftsLoadCursor fp = do
-  c <- lookupSession =<< ftsSessionKey fp
-  fromMaybe notFound (read <$> c)
-
-ftsInit :: FTWHandler y String
-ftsInit state@(FileTailState path ctxt) = do
-  (cur, txt) <- liftIO $ tailLast path ctxt
-  ftsSaveCursor path cur
-  return txt
-
-ftsCont :: FTWHandler y String
-ftsCont state@(FileTailState path _) = do
-  cur <- ftsLoadCursor path
-  (cur', txt) <- liftIO $ tailAfter path cur
-  ftsSaveCursor path cur
-  return txt
-
-defaultFileTailState :: FilePath -> FileTailState
-defaultFileTailState fp = FileTailState fp ftsInit ftsCont
 
 -- | start tailing, with at least n lines of context
 tailLast :: FilePath -> Int -> IO (Int, String)
