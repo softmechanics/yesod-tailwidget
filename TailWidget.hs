@@ -2,34 +2,48 @@
            , TypeFamilies
            , TypeSynonymInstances
            , FlexibleInstances
+           , FlexibleContexts
            , UndecidableInstances
            , OverlappingInstances
+           , MultiParamTypeClasses
+           , TemplateHaskell
            #-}
+
+module TailWidget where
 
 import Yesod
 import Text.Printf
 import System.Process
 import Control.Applicative
+import Language.Haskell.TH.Syntax
 import Data.Maybe
 
-
-mkYesodSub "TailWidget s y" [$parseRoutes|
-/#FilePath             TailLogR GET
-/tailLines/#FilePath   TailLinesR GET
-|]
-
-data TailWidget s y = TailWidget
+data TailWidget = TailWidget
   { twPollInterval :: Int
-  , twInit :: GHandler (TailWidget s y) y String
-  , twCont :: GHandler (TailWidget s y) y String
   }
+
+
+mkYesodSub "TailWidget" 
+  [ClassP ''Yesod [VarT $ mkName "master"]
+  ,ClassP ''YesodSubRoute [ConT ''TailWidget 
+                          ,VarT $ mkName "master"
+                          ]
+  ]
+  [$parseRoutes|
+/#FilePath                  TailLogR GET
+/tailLines/#FilePath        TailStartR GET
+/tailLines/#FilePath/#Int   TailContR GET
+|]
 
 getTailLogR fp = defaultLayout $ tailWidget fp
 
-tailWidget :: FilePath -> GWidget Test Test ()
+tailWidget :: YesodSubRoute TailWidget y => FilePath -> GWidget TailWidget y ()
 tailWidget fp = do
   addScriptRemote "http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"
   logPanel <- newIdent
+
+  rtm <- liftHandler $ getRouteToMaster
+
   addJulius [$julius| 
     function handleLogResponse(resp) {
       $('#%logPanel%').append(resp.lines);
@@ -37,14 +51,16 @@ tailWidget fp = do
       log.scrollTop = log.scrollHeight;
 
       function poll () { 
-          $.ajax({url:"@TailLinesR fp@"+resp.lastLine, success:handleLogResponse}); 
+          $.ajax({url:resp.pollUrl, success:handleLogResponse}); 
       }
 
-      setTimeout(poll, 1000);
+      if(resp.pollUrl) {
+        setTimeout(poll, 1000);
+      }
     }
 
     $(document).ready(function () {
-      $.ajax({url:"@TailLinesR fp@", success:handleLogResponse})
+      $.ajax({url:"@rtm TailStartR fp@", success:handleLogResponse})
     });
   |]
 
@@ -52,60 +68,26 @@ tailWidget fp = do
 %pre!id=$logPanel$!style=width:800px;height:100px;overflow-y:scroll;
 |]
 
-jsonNum :: Num a => a -> Json
-jsonNum = jsonScalar . show
+getTailStartR :: FilePath -> GHandler TailWidget y RepJson
+getTailStartR fp = do
+  (last, lines) <- liftIO $ tailLast fp 50
+  tailJsonResponse lines fp last
 
-getTailLinesR :: GHandler (TailWidget s y) y RepJson
-getTailLinesR fp = do
-  last <- lookupGetParam "lastLine"
-  (last', lines) <- case last of
-                         Nothing -> liftIO $ tailLast fp 50 
-                         Just ln -> do
-                           liftIO $ print ln
-                           liftIO $ tailAfter fp $ read ln
+getTailContR :: FilePath -> Int -> GHandler TailWidget y RepJson
+getTailContR fp last = do
+  (last', lines) <- liftIO $ do 
+    print last
+    tailAfter fp last
+  tailJsonResponse lines fp last'
+
+tailJsonResponse :: String -> FilePath -> Int -> GHandler TailWidget y RepJson
+tailJsonResponse lines fp last = do
+  render <- getUrlRender
+  rtm <- getRouteToMaster
   jsonToRepJson $ jsonMap [
-      ("lastLine", jsonScalar $ show last')
+      ("pollUrl", jsonScalar $ render $ rtm $ TailContR fp last)
     , ("lines", jsonScalar lines)
     ]
-
-data FileTailState = FileTailState
-  { ftsPath :: FilePath
-  , ftsContext :: Int
-  }
-
-type FTWHandler y = TWHandler FileTailState y
-type TWHandler s y = GHandler (TailWidget s y) y 
-
-
-ftsSessionKey fp = do
-  -- TODO: decorate with master route to subsite
-  return fp
-
-ftsSaveCursor :: Int -> FTWHandler y ()
-ftsSaveCursor fp cur = do
-  k <- ftsSessionKey fp
-  setSession k $ show cur
-
-ftsLoadCursor :: FTWHandler y Int
-ftsLoadCursor fp = do
-  c <- lookupSession =<< ftsSessionKey fp
-  fromMaybe notFound (read <$> c)
-
-ftsInit :: FTWHandler y String
-ftsInit state@(FileTailState path ctxt) = do
-  (cur, txt) <- liftIO $ tailLast path ctxt
-  ftsSaveCursor path cur
-  return txt
-
-ftsCont :: FTWHandler y String
-ftsCont state@(FileTailState path _) = do
-  cur <- ftsLoadCursor path
-  (cur', txt) <- liftIO $ tailAfter path cur
-  ftsSaveCursor path cur
-  return txt
-
-defaultFileTailState :: FilePath -> FileTailState
-defaultFileTailState fp = FileTailState fp ftsInit ftsCont
 
 -- | start tailing, with at least n lines of context
 tailLast :: FilePath -> Int -> IO (Int, String)
@@ -128,5 +110,4 @@ countLinesFile f = do
 
 countLinesString :: String -> Int
 countLinesString = length . filter (=='\n')
-
 
