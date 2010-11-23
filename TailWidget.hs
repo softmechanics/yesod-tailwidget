@@ -24,11 +24,7 @@ data TailWidget = TailWidget
 
 
 mkYesodSub "TailWidget" 
-  [ClassP ''Yesod [VarT $ mkName "master"]
-  ,ClassP ''YesodSubRoute [ConT ''TailWidget 
-                          ,VarT $ mkName "master"
-                          ]
-  ]
+  [ClassP ''Yesod [VarT $ mkName "master"]]
   [$parseRoutes|
 /#FilePath                  TailLogR GET
 /tailLines/#FilePath        TailStartR GET
@@ -37,7 +33,7 @@ mkYesodSub "TailWidget"
 
 getTailLogR fp = defaultLayout $ tailWidget fp
 
-tailWidget :: YesodSubRoute TailWidget y => FilePath -> GWidget TailWidget y ()
+tailWidget :: FilePath -> GWidget TailWidget y ()
 tailWidget fp = do
   addScriptRemote "http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"
   logPanel <- newIdent
