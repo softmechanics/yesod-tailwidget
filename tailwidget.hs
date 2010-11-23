@@ -17,27 +17,26 @@ import Yesod.Handler
 import Yesod.Dispatch
 import TailWidget
 
-data Test = Test { testContState :: ContState Test }
+data Test = Test { testContinuations :: Continuations Test }
+type TestContinuations = Continuations Test
 
 mkYesod "Test" [$parseRoutes|
 / RootR GET
-/cont/#ContKey ContR GET
+/cont/ ContSubR TestContinuations testContinuations
 |]
 
 instance Yesod Test where 
   approot _ = ""
 
 instance YesodContinuations Test where
-  getContState = testContState <$> getYesod
-  getContPruneInterval = return 1
-  getContinuationRoute _ = ContR
-
+  yesodContinuations = testContinuations
+instance YesodSubRoute TestContinuations Test where
+  fromSubRoute _ _ = ContSubR
 
 getRootR = defaultLayout $ tailWidget "date.log"
-getContR = contHandler
 
 main = do
   runCommand "./logger.sh"
-  contState <- newContState
+  contState <- newContinuations 1 -- check for and clean up expired session each request
   basicHandler 3000 $ Test contState
 

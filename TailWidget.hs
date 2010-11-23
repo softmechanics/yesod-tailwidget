@@ -21,7 +21,7 @@ tailWidget :: YesodContinuations y => FilePath -> GWidget s y ()
 tailWidget fp = do
   addScriptRemote "http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"
   logPanel <- newIdent
-  pollR <- liftHandler $ addCont $ getTailLinesR fp Nothing
+  pollR <- liftHandler $ addContinuation $ getTailLinesR fp Nothing
 
   addJulius [$julius| 
     function handleLogResponse(resp) {
@@ -57,7 +57,7 @@ getTailLinesR fp last = do
                          Just ln -> do
                            liftIO $ print ln
                            liftIO $ tailAfter fp ln
-  pollR <- addCont $ getTailLinesR fp $ Just last'
+  pollR <- addContinuation $ getTailLinesR fp $ Just last'
   render <- getUrlRender
   jsonToRepJson $ jsonMap [
       ("pollUrl", jsonScalar $ render pollR)
