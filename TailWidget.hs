@@ -20,21 +20,25 @@ import Data.Maybe
 
 data TailWidget = TailWidget
   { twPollInterval :: Int
+  , twFilePath :: FilePath
   }
-
 
 mkYesodSub "TailWidget" 
   [ClassP ''Yesod [VarT $ mkName "master"]]
   [$parseRoutes|
-/#FilePath                  TailLogR GET
-/tailLines/#FilePath        TailStartR GET
-/tailLines/#FilePath/#Int   TailContR GET
+/             TailLogR GET
+/start        TailStartR GET
+/cont/#Int    TailContR GET
 |]
 
-getTailLogR fp = defaultLayout $ tailWidget fp
+getFilePath :: GHandler TailWidget y FilePath
+getFilePath = twFilePath `fmap` getYesodSub
 
-tailWidget :: FilePath -> GWidget TailWidget y ()
-tailWidget fp = do
+getTailLogR :: Yesod y => GHandler TailWidget y RepHtml
+getTailLogR = defaultLayout $ tailWidget 
+
+tailWidget :: GWidget TailWidget y ()
+tailWidget = do
   addScriptRemote "http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"
   logPanel <- newIdent
 
@@ -56,7 +60,7 @@ tailWidget fp = do
     }
 
     $(document).ready(function () {
-      $.ajax({url:"@rtm TailStartR fp@", success:handleLogResponse})
+      $.ajax({url:"@rtm TailStartR@", success:handleLogResponse})
     });
   |]
 
@@ -64,24 +68,26 @@ tailWidget fp = do
 %pre!id=$logPanel$!style=width:800px;height:100px;overflow-y:scroll;
 |]
 
-getTailStartR :: FilePath -> GHandler TailWidget y RepJson
-getTailStartR fp = do
+getTailStartR :: GHandler TailWidget y RepJson
+getTailStartR = do
+  fp <- getFilePath
   (last, lines) <- liftIO $ tailLast fp 50
-  tailJsonResponse lines fp last
+  tailJsonResponse lines last
 
-getTailContR :: FilePath -> Int -> GHandler TailWidget y RepJson
-getTailContR fp last = do
+getTailContR :: Int -> GHandler TailWidget y RepJson
+getTailContR last = do
+  fp <- getFilePath
   (last', lines) <- liftIO $ do 
     print last
     tailAfter fp last
-  tailJsonResponse lines fp last'
+  tailJsonResponse lines last'
 
-tailJsonResponse :: String -> FilePath -> Int -> GHandler TailWidget y RepJson
-tailJsonResponse lines fp last = do
+tailJsonResponse :: String -> Int -> GHandler TailWidget y RepJson
+tailJsonResponse lines last = do
   render <- getUrlRender
   rtm <- getRouteToMaster
   jsonToRepJson $ jsonMap [
-      ("pollUrl", jsonScalar $ render $ rtm $ TailContR fp last)
+      ("pollUrl", jsonScalar $ render $ rtm $ TailContR last)
     , ("lines", jsonScalar lines)
     ]
 
