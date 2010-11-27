@@ -22,32 +22,23 @@ data Test = Test
 
 mkYesod "Test" [$parseRoutes|
 / RootR GET
-/tail/#FilePath/*Strings TailWidgetR GET
+/tail/#FilePath/ TailWidgetR TailWidget getTailW 
 |]
+
+getTailW :: FilePath -> GHandler Test Test TailWidget
+getTailW fp = return $ TailWidget 1 fp
 
 instance Yesod Test where 
   approot _ = ""
 
 instance YesodSubRoute TailWidget Test where
-  fromSubRoute (TailWidget _ fp) _ = TailWidgetR fp . fst . formatPathSegments tailWidgetSite
+  fromSubRoute (TailWidget _ fp) _ = TailWidgetR fp 
 
 tailWidgetSite :: Site (Route TailWidget) (String -> Maybe (GHandler TailWidget Test ChooseRep))
 tailWidgetSite = getSubSite
 
 getRootR :: GHandler Test Test RepHtml
-getRootR = redirect RedirectTemporary $ TailWidgetR "date.log" []
-
-getTailWidgetR :: FilePath -> Strings -> GHandler Test Test ChooseRep
-getTailWidgetR fp pieces = do
-  y <- getYesod
-  let tw = TailWidget 1 fp
-      getTW = const tw
-      site = tailWidgetSite
-      (Just handler) = handleSite site (error "Cannot use subsite render function") route "GET"
-      (Right route) = parsePathSegments site pieces
-
-  toMasterHandler (fromSubRoute tw y) getTW route handler
-
+getRootR = redirect RedirectTemporary $ TailWidgetR "date.log" TailLogR
 
 main = do
   runCommand "./logger.sh"
