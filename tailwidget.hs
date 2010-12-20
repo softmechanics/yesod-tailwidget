@@ -3,21 +3,18 @@
            , TypeFamilies
            , MultiParamTypeClasses
            , TypeSynonymInstances
+           , TemplateHaskell
            #-}
 
-import Control.Applicative
-import Control.Monad
-import Data.List
-import Data.Monoid
 import System.Process
 
 import Yesod
 import Yesod.Handler
-import Yesod.Dispatch
 import TailWidget
 
 data Test = Test
 
+getTailWidget :: Test -> TailWidget
 getTailWidget _ = TailWidget 1 
 
 mkYesod "Test" [$parseRoutes|
@@ -34,6 +31,7 @@ instance YesodSubRoute TailWidget Test where
 getRootR :: GHandler Test Test RepHtml
 getRootR = redirect RedirectTemporary $ TailWidgetR $ TailLogR "date.log"
 
+main :: IO ()
 main = do
   runCommand "./logger.sh"
   basicHandler 3000 Test
