@@ -3,6 +3,7 @@
            , TypeFamilies
            , MultiParamTypeClasses
            , TypeSynonymInstances
+           , TemplateHaskell
            #-}
 
 import Control.Applicative
@@ -30,12 +31,6 @@ getTailW fp = return $ TailWidget 1 fp
 
 instance Yesod Test where 
   approot _ = ""
-
-instance YesodSubRoute TailWidget Test where
-  fromSubRoute (TailWidget _ fp) _ = TailWidgetR fp 
-
-tailWidgetSite :: Site (Route TailWidget) (String -> Maybe (GHandler TailWidget Test ChooseRep))
-tailWidgetSite = getSubSite
 
 getRootR :: GHandler Test Test RepHtml
 getRootR = redirect RedirectTemporary $ TailWidgetR "date.log" TailLogR
