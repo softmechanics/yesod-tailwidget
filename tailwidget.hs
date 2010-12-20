@@ -6,28 +6,29 @@
            , TemplateHaskell
            #-}
 
-import Control.Applicative
-import Control.Monad
-import Data.List
-import Data.Monoid
 import System.Process
 
 import Yesod
-import Yesod.Handler
-import Yesod.Dispatch
 import TailWidget
-
-import Web.Routes.Site
 
 data Test = Test
 
 mkYesod "Test" [$parseRoutes|
 / RootR GET
-/tail/#FilePath/ TailWidgetR TailWidget getTailW 
+/tail/#FilePath/ TailWidgetR TailWidget getTailWidget
 |]
 
-getTailW :: FilePath -> GHandler Test Test TailWidget
-getTailW fp = return $ TailWidget 1 fp
+-- getTailWidget can be written in a monadic or pure style
+
+{-- Monadic version --
+getTailWidget :: FilePath -> GHandler Test Test TailWidget
+getTailWidget fp = return $ TailWidget 1 fp
+--}
+
+{-- Pure version --}
+getTailWidget :: FilePath -> Test -> TailWidget
+getTailWidget fp _ = TailWidget 1 fp
+--}
 
 instance Yesod Test where 
   approot _ = ""
@@ -35,6 +36,7 @@ instance Yesod Test where
 getRootR :: GHandler Test Test RepHtml
 getRootR = redirect RedirectTemporary $ TailWidgetR "date.log" TailLogR
 
+main :: IO ()
 main = do
   runCommand "./logger.sh"
   basicHandler 3000 Test
