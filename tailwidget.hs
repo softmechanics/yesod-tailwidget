@@ -20,14 +20,14 @@ mkYesod "Test" [$parseRoutes|
 
 -- getTailWidget can be written in a monadic or pure style
 
-{-- Monadic version --
-getTailWidget :: FilePath -> GHandler Test Test TailWidget
-getTailWidget fp = return $ TailWidget 1 fp
+{-- Monadic version --  TODO broken
+getTailWidget :: Test -> FilePath -> GHandler Test Test TailWidget
+getTailWidget _ fp = return $ TailWidget 1 fp
 --}
 
 {-- Pure version --}
-getTailWidget :: FilePath -> Test -> TailWidget
-getTailWidget fp _ = TailWidget 1 fp
+getTailWidget :: Test -> FilePath -> TailWidget
+getTailWidget _ fp = TailWidget 1 fp
 --}
 
 instance Yesod Test where 
@@ -39,5 +39,5 @@ getRootR = redirect RedirectTemporary $ TailWidgetR "date.log" TailLogR
 main :: IO ()
 main = do
   runCommand "./logger.sh"
-  basicHandler 3000 Test
+  warp 3000 Test
 

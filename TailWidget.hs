@@ -12,11 +12,16 @@
 module TailWidget where
 
 import Yesod
+import Yesod.Json
 import Text.Printf
 import System.Process
 import Control.Applicative
-import Language.Haskell.TH.Syntax
+import Language.Haskell.TH.Syntax hiding (lift)
 import Data.Maybe
+import Data.JSON.Types
+
+jsonMap = undefined
+jsonScalar = undefined
 
 data TailWidget = TailWidget
   { twPollInterval :: Int
@@ -40,14 +45,14 @@ getTailLogR = defaultLayout $ tailWidget
 tailWidget :: GWidget TailWidget y ()
 tailWidget = do
   addScriptRemote "http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"
-  logPanel <- newIdent
+  logPanel <- lift newIdent
 
-  rtm <- liftHandler $ getRouteToMaster
+  rtm <- lift getRouteToMaster
 
   addJulius [$julius| 
     function handleLogResponse(resp) {
-      $('#%logPanel%').append(resp.lines);
-      var log = document.getElementById('%logPanel%');
+      $('##{logPanel}').append(resp.lines);
+      var log = document.getElementById('#{logPanel}');
       log.scrollTop = log.scrollHeight;
 
       function poll () { 
@@ -60,12 +65,12 @@ tailWidget = do
     }
 
     $(document).ready(function () {
-      $.ajax({url:"@rtm TailStartR@", success:handleLogResponse})
+      $.ajax({url:"@{rtm TailStartR}", success:handleLogResponse})
     });
   |]
 
   addHamlet [$hamlet|
-%pre!id=$logPanel$!style=width:800px;height:100px;overflow-y:scroll;
+<pre id=#{logPanel} style=width:800px;height:100px;overflow-y:scroll;
 |]
 
 getTailStartR :: GHandler TailWidget y RepJson
