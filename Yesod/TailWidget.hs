@@ -20,9 +20,6 @@ import Language.Haskell.TH.Syntax hiding (lift)
 import Data.Maybe
 import Data.JSON.Types
 
-jsonMap = undefined
-jsonScalar = undefined
-
 data TailWidget = TailWidget
   { twPollInterval :: Int
   , twFilePath :: FilePath
