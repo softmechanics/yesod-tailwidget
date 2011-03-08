@@ -25,6 +25,7 @@ data TailWidget = TailWidget
   , twFilePath :: FilePath
   , twTailAfter :: FilePath -> Int -> IO String
   , twCountLines :: FilePath -> IO Int
+  , twWidgetStyle :: String
   }
 
 defaultTailWidget = TailWidget
@@ -32,6 +33,7 @@ defaultTailWidget = TailWidget
   , twFilePath = error "twFilePath not set"
   , twTailAfter = defaultTwTail
   , twCountLines = defaultTwCountLines
+  , twWidgetStyle = "width:800px;height:100px;"
   }
 
 defaultTwTail :: FilePath -> Int -> IO String
@@ -83,8 +85,9 @@ tailWidget = do
     });
   |]
 
+  tw <- lift getYesodSub
   addHamlet [$hamlet|
-<pre id=#{logPanel} style=width:800px;height:100px;overflow-y:scroll;
+<pre id=#{logPanel} style=overflow-y:scroll;#{twWidgetStyle tw}
 |]
 
 getTailStartR :: Yesod y => GHandler TailWidget y RepJson
