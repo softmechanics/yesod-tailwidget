@@ -9,7 +9,7 @@
            , TemplateHaskell
            #-}
 
-module TailWidget where
+module Yesod.TailWidget where
 
 import Yesod
 import Yesod.Json

@@ -9,7 +9,7 @@
 import System.Process
 
 import Yesod
-import TailWidget
+import Yesod.TailWidget
 
 data Test = Test
 
@@ -20,7 +20,7 @@ mkYesod "Test" [$parseRoutes|
 
 -- getTailWidget can be written in a monadic or pure style
 
-{-- Monadic version --  TODO broken
+{-- Monadic version --  TODO broken --
 getTailWidget :: Test -> FilePath -> GHandler Test Test TailWidget
 getTailWidget _ fp = return $ TailWidget 1 fp
 --}

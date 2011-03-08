@@ -1,0 +1,23 @@
+Name:                yesod-tailwidget
+Version:             0.1
+Synopsis:            Yesod subsite for tailing files with ajax.
+Homepage:            https://github.com/softmechanics/yesod-tailwidget
+License:             BSD3
+License-file:        LICENSE
+Author:              Matt Brown
+Maintainer:          matt@softmechanics.net
+Category:            Web
+Build-type:          Simple
+Cabal-version:       >=1.2
+
+
+Library
+  Exposed-modules:     Yesod.TailWidget
+  
+  Build-depends:       base
+                     , yesod                >= 0.7
+                     , yesod-json
+                     , json-types
+                     , template-haskell
+                     , process
+  
