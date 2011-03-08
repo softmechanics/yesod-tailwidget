@@ -60,6 +60,9 @@ getTailLogR = defaultLayout $ tailWidget
 
 tailWidget :: GWidget TailWidget y ()
 tailWidget = do
+  tw <- lift getYesodSub
+  let pollInterval = show $ 1000 * twPollInterval tw
+
   addScriptRemote "http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"
   logPanel <- lift newIdent
 
@@ -76,7 +79,7 @@ tailWidget = do
       }
 
       if(resp.pollUrl) {
-        setTimeout(poll, 1000);
+        setTimeout(poll, #{pollInterval});
       }
     }
 
@@ -85,7 +88,6 @@ tailWidget = do
     });
   |]
 
-  tw <- lift getYesodSub
   addHamlet [$hamlet|
 <pre id=#{logPanel} style=overflow-y:scroll;#{twWidgetStyle tw}
 |]
