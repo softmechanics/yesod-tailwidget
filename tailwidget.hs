@@ -27,7 +27,10 @@ getTailWidget _ fp = return $ TailWidget 1 fp
 
 {-- Pure version --}
 getTailWidget :: Test -> FilePath -> TailWidget
-getTailWidget _ fp = TailWidget 1 fp
+getTailWidget _ fp = defaultTailWidget 
+  { twPollInterval = 1
+  , twFilePath = fp
+  }
 --}
 
 instance Yesod Test where 

@@ -23,7 +23,24 @@ import Data.JSON.Types
 data TailWidget = TailWidget
   { twPollInterval :: Int
   , twFilePath :: FilePath
+  , twTailAfter :: FilePath -> Int -> IO String
+  , twCountLines :: FilePath -> IO Int
   }
+
+defaultTailWidget = TailWidget
+  { twPollInterval = 10 
+  , twFilePath = error "twFilePath not set"
+  , twTailAfter = defaultTwTail
+  , twCountLines = defaultTwCountLines
+  }
+
+defaultTwTail :: FilePath -> Int -> IO String
+defaultTwTail fp startLine = readProcess "tail" ["-n", "+" ++ show startLine, fp] []
+
+defaultTwCountLines :: FilePath -> IO Int
+defaultTwCountLines fp = do
+  lines <- readProcess "wc" ["-l", fp] []
+  return $ read $ head $ words lines
 
 mkYesodSub "TailWidget" 
   [ClassP ''Yesod [VarT $ mkName "master"]]
@@ -70,21 +87,19 @@ tailWidget = do
 <pre id=#{logPanel} style=width:800px;height:100px;overflow-y:scroll;
 |]
 
-getTailStartR :: GHandler TailWidget y RepJson
+getTailStartR :: Yesod y => GHandler TailWidget y RepJson
 getTailStartR = do
   fp <- getFilePath
-  (last, lines) <- liftIO $ tailLast fp 50
+  (last, lines) <- tailLast fp 50
   tailJsonResponse lines last
 
-getTailContR :: Int -> GHandler TailWidget y RepJson
+getTailContR :: Yesod y => Int -> GHandler TailWidget y RepJson
 getTailContR last = do
   fp <- getFilePath
-  (last', lines) <- liftIO $ do 
-    print last
-    tailAfter fp last
+  (last', lines) <- tailAfter fp last
   tailJsonResponse lines last'
 
-tailJsonResponse :: String -> Int -> GHandler TailWidget y RepJson
+tailJsonResponse :: Yesod y => String -> Int -> GHandler TailWidget y RepJson
 tailJsonResponse lines last = do
   render <- getUrlRender
   rtm <- getRouteToMaster
@@ -94,23 +109,23 @@ tailJsonResponse lines last = do
     ]
 
 -- | start tailing, with at least n lines of context
-tailLast :: FilePath -> Int -> IO (Int, String)
+tailLast :: Yesod y => FilePath -> Int -> GHandler TailWidget y (Int, String)
 tailLast fp n = do
-  lines <- countLinesFile fp
+  lines <- countLines fp
   let start = max 1 $ lines - n
   tailAfter fp start
 
-tailAfter :: FilePath -> Int -> IO (Int, String)
+tailAfter :: Yesod y => FilePath -> Int -> GHandler TailWidget y (Int, String)
 tailAfter fp start = do
-  text <- readProcess "tail" ["-n", "+" ++ show start, fp] []
+  tw <- getYesodSub
+  text <- liftIO $ twTailAfter tw fp start
   let end = start + (countLinesString text) 
   return (end, text)
 
-countLinesFile :: FilePath -> IO Int
-countLinesFile f = do
-  lines <- readProcess "wc" ["-l", f] []
-  putStrLn lines
-  return $ read $ head $ words lines
+countLines :: Yesod y => FilePath -> GHandler TailWidget y Int
+countLines fp = do
+  tw <- getYesodSub
+  liftIO $ twCountLines tw fp
 
 countLinesString :: String -> Int
 countLinesString = length . filter (=='\n')
