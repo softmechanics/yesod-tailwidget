@@ -22,6 +22,7 @@ import Data.JSON.Types
 
 data TailWidget = TailWidget
   { twPollInterval :: Int
+  , twLinesContext :: Int
   , twFilePath :: FilePath
   , twTailAfter :: FilePath -> Int -> IO String
   , twCountLines :: FilePath -> IO Int
@@ -30,6 +31,7 @@ data TailWidget = TailWidget
 
 defaultTailWidget = TailWidget
   { twPollInterval = 10 
+  , twLinesContext = 20
   , twFilePath = error "twFilePath not set"
   , twTailAfter = defaultTwTail
   , twCountLines = defaultTwCountLines
@@ -94,8 +96,10 @@ tailWidget = do
 
 getTailStartR :: Yesod y => GHandler TailWidget y RepJson
 getTailStartR = do
-  fp <- getFilePath
-  (last, lines) <- tailLast fp 50
+  tw <- getYesodSub
+  let fp = twFilePath tw
+      cxt = twLinesContext tw
+  (last, lines) <- tailLast fp cxt
   tailJsonResponse lines last
 
 getTailContR :: Yesod y => Int -> GHandler TailWidget y RepJson
